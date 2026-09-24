@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hues & Cues - VLM Model Prediction Visualizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Top Header -->
+    <header class="header">
+        <div class="brand">
+            <div class="brand-icon">VLM</div>
+            <div class="brand-text">
+                <h1>Hues & Cues VLM Visualizer</h1>
+                <p>Vision-Language Models Color Prediction Analysis</p>
+            </div>
+        </div>
+
+        <!-- View Mode Navigation Tabs -->
+        <div class="view-tabs">
+            <button id="tab-single" class="view-tab-btn active">
+                <span class="icon">🎯</span> Single Model
+            </button>
+            <button id="tab-compare" class="view-tab-btn">
+                <span class="icon">⚖️</span> Model Comparison
+            </button>
+            <button id="tab-benchmark" class="view-tab-btn">
+                <span class="icon">📋</span> Benchmark Table
+            </button>
+        </div>
+
+        <div class="header-stats">
+            <div class="stat-pill">
+                <span class="lbl">Detected Models:</span>
+                <span id="stat-total-models" class="val">-</span>
+            </div>
+            <div class="stat-pill">
+                <span class="lbl">Total Words:</span>
+                <span id="stat-total-words" class="val">-</span>
+            </div>
+            <div class="stat-pill highlight">
+                <span class="lbl">Samples / Word:</span>
+                <span class="val">100</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <div class="main-container">
+        <!-- Sidebar Controls & Summaries -->
+        <aside id="sidebar" class="sidebar">
+            
+            <!-- Model Selection Card -->
+            <div class="card" id="model-select-card">
+                <div class="card-header">
+                    <span class="card-title">🤖 Select Model</span>
+                </div>
+                <div class="select-group" id="single-model-picker">
+                    <div class="select-wrapper">
+                        <select id="model-select" class="form-control"></select>
+                    </div>
+                </div>
+                
+                <!-- Dual Model Pickers for Comparison Mode -->
+                <div id="compare-model-pickers" class="compare-pickers hidden">
+                    <div class="select-group">
+                        <label for="compare-model-a">Model A:</label>
+                        <div class="select-wrapper">
+                            <select id="compare-model-a" class="form-control"></select>
+                        </div>
+                    </div>
+                    <div class="select-group" style="margin-top: 0.5rem;">
+                        <label for="compare-model-b">Model B:</label>
+                        <div class="select-wrapper">
+                            <select id="compare-model-b" class="form-control"></select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Word Navigator Card -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">🔍 Word Navigator</span>
+                    <span id="word-counter-badge" class="badge">1 / 116</span>
+                </div>
+                <div class="search-box">
+                    <input type="text" id="word-search" class="form-control search-input" placeholder="Search word..." autocomplete="off">
+                </div>
+                <div class="select-group">
+                    <div class="select-wrapper">
+                        <select id="word-select" class="form-control"></select>
+                    </div>
+                </div>
+                <div class="nav-buttons">
+                    <button id="prev-btn" class="btn" title="Previous word (Left Arrow)">◀ Prev</button>
+                    <button id="random-btn" class="btn" title="Random word">🎲 Random</button>
+                    <button id="next-btn" class="btn" title="Next word (Right Arrow)">Next ▶</button>
+                </div>
+            </div>
+
+            <!-- Current Word Summary Card (Single View) -->
+            <div class="card" id="single-summary-card">
+                <div class="card-header">
+                    <span class="card-title">📊 Word Summary</span>
+                    <span id="active-model-badge" class="badge highlight">MODEL</span>
+                </div>
+                <h2 id="word-title" class="word-title">WORD</h2>
+                
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="label">Total Samples</div>
+                        <div id="total-samples-val" class="value">100</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="label">Unique Cells</div>
+                        <div id="unique-cells-val" class="value">0</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="label">Entropy (Spread)</div>
+                        <div id="entropy-val" class="value">0.00</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="label">Mode Confidence</div>
+                        <div id="mode-pct-val" class="value" style="color: var(--accent-gold);">0%</div>
+                    </div>
+                    
+                    <!-- Mode Consensus -->
+                    <div class="summary-item full-width highlight-mode">
+                        <div class="label">👑 Casilla Moda (Consenso)</div>
+                        <div class="consensus-display">
+                            <span id="consensus-swatch" class="color-swatch-sm"></span>
+                            <span id="consensus-val" class="consensus-coord">-</span>
+                            <span id="consensus-sub" class="stat-sub"></span>
+                        </div>
+                    </div>
+
+                    <!-- Manhattan Median -->
+                    <div class="summary-item full-width highlight-median">
+                        <div class="label">🎯 Casilla Media (Distancia Manhattan)</div>
+                        <div class="consensus-display">
+                            <span id="median-swatch" class="color-swatch-sm"></span>
+                            <span id="median-val" class="median-coord">-</span>
+                            <span id="median-dist-sub" class="stat-sub"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Predictions Breakdown Card -->
+            <div class="card" id="top-predictions-card">
+                <div class="card-header">
+                    <span class="card-title">🏆 Top Predicted Cells</span>
+                </div>
+                <div id="top-coords-list" class="top-coords-list">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- Comparative Summary Card (Comparison View Only) -->
+            <div class="card hidden" id="comparison-summary-card">
+                <div class="card-header">
+                    <span class="card-title">⚖️ Model Comparison Metrics</span>
+                </div>
+                <h2 id="compare-word-title" class="word-title">WORD</h2>
+                
+                <div class="comparison-metrics-list">
+                    <div class="metric-row">
+                        <span class="m-label">👑 Mode Agreement:</span>
+                        <span id="cmp-agreement-val" class="m-val badge">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="m-label">🎯 Manhattan Median Agreement:</span>
+                        <span id="cmp-med-agreement-val" class="m-val badge">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="m-label">Distribution Overlap:</span>
+                        <span id="cmp-overlap-val" class="m-val font-mono">0%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="m-label">Mode Grid Distance:</span>
+                        <span id="cmp-grid-dist-val" class="m-val font-mono">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="m-label">Mode Color Distance (ΔRGB):</span>
+                        <span id="cmp-rgb-dist-val" class="m-val font-mono">-</span>
+                    </div>
+                </div>
+
+                <div class="model-versus-modes">
+                    <div class="versus-col">
+                        <div class="v-model-name" id="cmp-col-a-name">Model A</div>
+                        <div class="v-swatch-container">
+                            <span id="cmp-swatch-a" class="color-swatch-sm"></span>
+                            <span id="cmp-coord-a" class="v-coord">-</span>
+                        </div>
+                        <div class="v-pct" id="cmp-pct-a">0%</div>
+                        <div class="v-med" id="cmp-med-a">🎯 -</div>
+                    </div>
+                    <div class="versus-divider">VS</div>
+                    <div class="versus-col">
+                        <div class="v-model-name" id="cmp-col-b-name">Model B</div>
+                        <div class="v-swatch-container">
+                            <span id="cmp-swatch-b" class="color-swatch-sm"></span>
+                            <span id="cmp-coord-b" class="v-coord">-</span>
+                        </div>
+                        <div class="v-pct" id="cmp-pct-b">0%</div>
+                        <div class="v-med" id="cmp-med-b">🎯 -</div>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Display Area: Single Model Grid -->
+        <main id="single-view-container" class="display-area">
+            <div class="board-container-card">
+                <div class="board-toolbar">
+                    <div class="toolbar-title">
+                        🎨 Hues & Cues Board Grid (16 × 30)
+                        <span id="current-board-word" class="word-tag">WORD</span>
+                    </div>
+                    <div class="toggle-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="toggle-heatmap" checked>
+                            <span>Heatmap</span>
+                        </label>
+                        <label class="toggle-label">
+                            <input type="checkbox" id="toggle-counts" checked>
+                            <span>Counts</span>
+                        </label>
+                        <label class="toggle-label">
+                            <input type="checkbox" id="toggle-consensus" checked>
+                            <span style="color: var(--accent-gold);">👑 Moda</span>
+                        </label>
+                        <label class="toggle-label">
+                            <input type="checkbox" id="toggle-median" checked>
+                            <span style="color: var(--accent-cyan);">🎯 Media (Manhattan)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Interactive Board Grid -->
+                <div class="board-wrapper">
+                    <div id="board-grid" class="board-grid-container">
+                        <!-- 16 x 30 grid loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Legend Bar -->
+                <div class="legend-bar">
+                    <div class="legend-item">
+                        <span class="legend-label">Pick Frequency:</span>
+                        <div class="legend-color-ramp"></div>
+                        <span class="legend-text">1% → 100%</span>
+                    </div>
+                    <div class="legend-item" style="margin-left: 1.25rem;">
+                        <span class="legend-crown">👑</span>
+                        <span style="color: var(--accent-gold); font-weight: 600;">👑 Casilla Moda:</span>
+                        <span class="legend-text-subtle">Más votada</span>
+                    </div>
+                    <div class="legend-item" style="margin-left: 1.25rem;">
+                        <span class="legend-target">🎯</span>
+                        <span style="color: var(--accent-cyan); font-weight: 600;">🎯 Casilla Media:</span>
+                        <span class="legend-text-subtle">Mediana espacial Manhattan</span>
+                    </div>
+                    <div class="legend-item" style="margin-left: auto;">
+                        <span class="legend-text-subtle">Tip: Pasa el ratón por las casillas para ver detalles</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Display Area: Side-by-Side Comparison View -->
+        <main id="compare-view-container" class="display-area compare-display hidden">
+            <div class="compare-boards-grid">
+                <!-- Board A -->
+                <div class="board-container-card">
+                    <div class="board-toolbar">
+                        <div class="toolbar-title">
+                            🤖 <span id="board-title-a">Model A</span>
+                        </div>
+                    </div>
+                    <div class="board-wrapper">
+                        <div id="board-grid-a" class="board-grid-container board-grid-sm"></div>
+                    </div>
+                </div>
+
+                <!-- Board B -->
+                <div class="board-container-card">
+                    <div class="board-toolbar">
+                        <div class="toolbar-title">
+                            🤖 <span id="board-title-b">Model B</span>
+                        </div>
+                    </div>
+                    <div class="board-wrapper">
+                        <div id="board-grid-b" class="board-grid-container board-grid-sm"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Display Area: Global Benchmark Table View -->
+        <main id="benchmark-view-container" class="display-area benchmark-display hidden">
+            <div class="benchmark-card">
+                <div class="benchmark-toolbar">
+                    <div class="benchmark-title-wrap">
+                        <h2>📋 Global Model Benchmark Summary</h2>
+                        <p>Complete word-by-word comparison across all evaluated models</p>
+                    </div>
+                    <div class="benchmark-filter-wrap">
+                        <input type="text" id="benchmark-search" class="form-control" placeholder="Filter by word...">
+                        <select id="benchmark-filter-agreement" class="form-control" style="width: auto;">
+                            <option value="all">All Words</option>
+                            <option value="match">Mode Matches Only</option>
+                            <option value="diff">Mode Differences Only</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="benchmark-table" id="benchmark-table">
+                        <thead>
+                            <tr id="benchmark-thead-row">
+                                <th>#</th>
+                                <th>Word</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="benchmark-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Floating Hover Tooltip -->
+    <div id="cell-tooltip" class="cell-tooltip"></div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
