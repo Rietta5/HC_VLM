@@ -1,10 +1,15 @@
 import os
 import glob
+import re
 import math
 import numpy as np
 import pandas as pd
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+def natural_sort_key(s):
+    """Sort strings containing numbers in human/natural order (e.g. 2B, 4B, 8B, 14B)."""
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', str(s))]
 
 def resolve_path(path):
     if os.path.isabs(path):
@@ -75,7 +80,7 @@ class DataLoader:
         pattern = os.path.join(self.data_dir, "results_HC_*.csv")
         csv_files = glob.glob(pattern)
         
-        for file_path in sorted(csv_files):
+        for file_path in sorted(csv_files, key=natural_sort_key):
             filename = os.path.basename(file_path)
             model_name = filename
             if filename.startswith("results_HC_") and filename.endswith(".csv"):
@@ -92,8 +97,8 @@ class DataLoader:
                 print(f"[DataLoader] Error loading {filename}: {e}")
 
     def get_models(self):
-        """Returns list of available model names."""
-        return list(self.models_data.keys())
+        """Returns list of available model names sorted naturally."""
+        return sorted(list(self.models_data.keys()), key=natural_sort_key)
 
     def get_board_grid(self):
         """Returns board setup details including dimensions and cell info."""
@@ -155,9 +160,13 @@ class DataLoader:
         sorted_words = sorted(list(all_words), key=lambda x: (x == ' ', x))
         words_summary = []
         
+        models = self.get_models()
         for word in sorted_words:
             model_summaries = {}
-            for model_name, df in self.models_data.items():
+            for model_name in models:
+                df = self.models_data.get(model_name)
+                if df is None:
+                    continue
                 match = df[df['Palabra'] == word]
                 if not match.empty:
                     answers = self._get_answers_list(match.iloc[0])
@@ -227,7 +236,7 @@ class DataLoader:
             return None
         word_norm = word_name.strip().upper() if word_name.strip() else ' '
         
-        models_to_process = [model_name] if model_name and model_name in self.models_data else list(self.models_data.keys())
+        models_to_process = [model_name] if model_name and model_name in self.models_data else self.get_models()
         
         results = {}
         for m_name in models_to_process:
