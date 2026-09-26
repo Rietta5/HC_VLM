@@ -35,11 +35,15 @@
 
         <div class="header-stats">
             <div class="stat-pill">
-                <span class="lbl">Detected Models:</span>
+                <span class="lbl">Models:</span>
                 <span id="stat-total-models" class="val">-</span>
             </div>
             <div class="stat-pill">
-                <span class="lbl">Total Words:</span>
+                <span class="lbl">Formats:</span>
+                <span id="stat-total-formats" class="val">-</span>
+            </div>
+            <div class="stat-pill">
+                <span class="lbl">Words:</span>
                 <span id="stat-total-words" class="val">-</span>
             </div>
             <div class="stat-pill highlight">
@@ -54,29 +58,63 @@
         <!-- Sidebar Controls & Summaries -->
         <aside id="sidebar" class="sidebar">
             
-            <!-- Model Selection Card -->
+            <!-- Model & Format Selection Card -->
             <div class="card" id="model-select-card">
                 <div class="card-header">
-                    <span class="card-title">🤖 Select Model</span>
+                    <span class="card-title">🤖 Model & Image Format</span>
                 </div>
-                <div class="select-group" id="single-model-picker">
-                    <div class="select-wrapper">
-                        <select id="model-select" class="form-control"></select>
+                
+                <!-- Single Model & Format Pickers -->
+                <div id="single-model-picker" class="picker-dual-grid">
+                    <div class="select-group">
+                        <label for="model-select">Model:</label>
+                        <div class="select-wrapper">
+                            <select id="model-select" class="form-control"></select>
+                        </div>
+                    </div>
+                    <div class="select-group">
+                        <label for="format-select">Image Format:</label>
+                        <div class="select-wrapper">
+                            <select id="format-select" class="form-control"></select>
+                        </div>
                     </div>
                 </div>
                 
-                <!-- Dual Model Pickers for Comparison Mode -->
+                <!-- Dual Model & Format Pickers for Comparison Mode -->
                 <div id="compare-model-pickers" class="compare-pickers hidden">
-                    <div class="select-group">
-                        <label for="compare-model-a">Model A:</label>
-                        <div class="select-wrapper">
-                            <select id="compare-model-a" class="form-control"></select>
+                    <div class="compare-box">
+                        <div class="compare-box-title">Dataset A</div>
+                        <div class="picker-dual-grid">
+                            <div class="select-group">
+                                <label for="compare-model-a">Model:</label>
+                                <div class="select-wrapper">
+                                    <select id="compare-model-a" class="form-control"></select>
+                                </div>
+                            </div>
+                            <div class="select-group">
+                                <label for="compare-format-a">Format:</label>
+                                <div class="select-wrapper">
+                                    <select id="compare-format-a" class="form-control"></select>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="select-group" style="margin-top: 0.5rem;">
-                        <label for="compare-model-b">Model B:</label>
-                        <div class="select-wrapper">
-                            <select id="compare-model-b" class="form-control"></select>
+
+                    <div class="compare-box" style="margin-top: 0.75rem;">
+                        <div class="compare-box-title">Dataset B</div>
+                        <div class="picker-dual-grid">
+                            <div class="select-group">
+                                <label for="compare-model-b">Model:</label>
+                                <div class="select-wrapper">
+                                    <select id="compare-model-b" class="form-control"></select>
+                                </div>
+                            </div>
+                            <div class="select-group">
+                                <label for="compare-format-b">Format:</label>
+                                <div class="select-wrapper">
+                                    <select id="compare-format-b" class="form-control"></select>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -107,7 +145,10 @@
             <div class="card" id="single-summary-card">
                 <div class="card-header">
                     <span class="card-title">📊 Word Summary</span>
-                    <span id="active-model-badge" class="badge highlight">MODEL</span>
+                    <div class="badge-group">
+                        <span id="active-model-badge" class="badge highlight">MODEL</span>
+                        <span id="active-format-badge" class="badge format-badge">PNG</span>
+                    </div>
                 </div>
                 <h2 id="word-title" class="word-title">WORD</h2>
                 
@@ -193,7 +234,7 @@
 
                 <div class="model-versus-modes">
                     <div class="versus-col">
-                        <div class="v-model-name" id="cmp-col-a-name">Model A</div>
+                        <div class="v-model-name" id="cmp-col-a-name">Dataset A</div>
                         <div class="v-swatch-container">
                             <span id="cmp-swatch-a" class="color-swatch-sm"></span>
                             <span id="cmp-coord-a" class="v-coord">-</span>
@@ -203,7 +244,7 @@
                     </div>
                     <div class="versus-divider">VS</div>
                     <div class="versus-col">
-                        <div class="v-model-name" id="cmp-col-b-name">Model B</div>
+                        <div class="v-model-name" id="cmp-col-b-name">Dataset B</div>
                         <div class="v-swatch-container">
                             <span id="cmp-swatch-b" class="color-swatch-sm"></span>
                             <span id="cmp-coord-b" class="v-coord">-</span>
@@ -282,7 +323,7 @@
                 <div class="board-container-card">
                     <div class="board-toolbar">
                         <div class="toolbar-title">
-                            🤖 <span id="board-title-a">Model A</span>
+                            🤖 <span id="board-title-a">Dataset A</span>
                         </div>
                     </div>
                     <div class="board-wrapper">
@@ -294,7 +335,7 @@
                 <div class="board-container-card">
                     <div class="board-toolbar">
                         <div class="toolbar-title">
-                            🤖 <span id="board-title-b">Model B</span>
+                            🤖 <span id="board-title-b">Dataset B</span>
                         </div>
                     </div>
                     <div class="board-wrapper">
@@ -310,10 +351,13 @@
                 <div class="benchmark-toolbar">
                     <div class="benchmark-title-wrap">
                         <h2>📋 Global Model Benchmark Summary</h2>
-                        <p>Complete word-by-word comparison across all evaluated models</p>
+                        <p>Complete word-by-word comparison across all evaluated models and image formats</p>
                     </div>
                     <div class="benchmark-filter-wrap">
                         <input type="text" id="benchmark-search" class="form-control" placeholder="Filter by word...">
+                        <select id="benchmark-filter-format" class="form-control" style="width: auto;">
+                            <option value="all">All Formats</option>
+                        </select>
                         <select id="benchmark-filter-agreement" class="form-control" style="width: auto;">
                             <option value="all">All Words</option>
                             <option value="match">Mode Matches Only</option>

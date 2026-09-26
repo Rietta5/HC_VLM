@@ -28,7 +28,10 @@ def index():
 @app.route('/api/models')
 def get_models():
     return jsonify({
-        "models": data_loader.get_models()
+        "models": data_loader.get_models(),
+        "formats": data_loader.get_formats(),
+        "model_formats": data_loader.get_model_formats_map(),
+        "entries": data_loader.get_entries()
     })
 
 @app.route('/api/board')
@@ -43,14 +46,16 @@ def get_words():
 @app.route('/api/word/<path:word_name>')
 def get_word(word_name):
     model_name = request.args.get('model', None)
-    analysis = data_loader.get_word_analysis(word_name, model_name=model_name)
+    img_format = request.args.get('format', None)
+    analysis = data_loader.get_word_analysis(word_name, model_name=model_name, img_format=img_format)
     if analysis is None:
         return jsonify({"error": f"Word '{word_name}' not found"}), 404
     return jsonify(analysis)
 
 @app.route('/api/benchmark')
 def get_benchmark():
-    return jsonify(data_loader.get_benchmark_summary())
+    format_filter = request.args.get('format', None)
+    return jsonify(data_loader.get_benchmark_summary(format_filter=format_filter))
 
 if __name__ == '__main__':
     import socket

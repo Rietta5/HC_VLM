@@ -2,14 +2,20 @@
 
 let boardData = null;
 let modelsList = [];
+let formatsList = [];
+let modelFormatsMap = {};
+let entriesList = [];
 let wordsList = [];
 let currentWordIndex = 0;
 let currentWordData = null;
 
 let activeView = 'single'; // 'single' | 'compare' | 'benchmark'
 let activeModel = '';
+let activeFormat = '';
 let compareModelA = '';
+let compareFormatA = '';
 let compareModelB = '';
+let compareFormatB = '';
 
 // Toggles
 let showHeatmap = true;
@@ -23,6 +29,7 @@ const tabCompare = document.getElementById('tab-compare');
 const tabBenchmark = document.getElementById('tab-benchmark');
 
 const statTotalModels = document.getElementById('stat-total-models');
+const statTotalFormats = document.getElementById('stat-total-formats');
 const statTotalWords = document.getElementById('stat-total-words');
 
 const sidebar = document.getElementById('sidebar');
@@ -32,10 +39,14 @@ const benchmarkViewContainer = document.getElementById('benchmark-view-container
 
 // Pickers & Controls
 const modelSelect = document.getElementById('model-select');
+const formatSelect = document.getElementById('format-select');
 const singleModelPicker = document.getElementById('single-model-picker');
 const compareModelPickers = document.getElementById('compare-model-pickers');
+
 const compareModelSelectA = document.getElementById('compare-model-a');
+const compareFormatSelectA = document.getElementById('compare-format-a');
 const compareModelSelectB = document.getElementById('compare-model-b');
+const compareFormatSelectB = document.getElementById('compare-format-b');
 
 const wordSelect = document.getElementById('word-select');
 const wordSearch = document.getElementById('word-search');
@@ -48,6 +59,7 @@ const randomBtn = document.getElementById('random-btn');
 const singleSummaryCard = document.getElementById('single-summary-card');
 const topPredictionsCard = document.getElementById('top-predictions-card');
 const activeModelBadge = document.getElementById('active-model-badge');
+const activeFormatBadge = document.getElementById('active-format-badge');
 const wordTitle = document.getElementById('word-title');
 const totalSamplesVal = document.getElementById('total-samples-val');
 const uniqueCellsVal = document.getElementById('unique-cells-val');
@@ -99,6 +111,7 @@ const toggleMedian = document.getElementById('toggle-median');
 
 // Benchmark elements
 const benchmarkSearch = document.getElementById('benchmark-search');
+const benchmarkFilterFormat = document.getElementById('benchmark-filter-format');
 const benchmarkFilterAgreement = document.getElementById('benchmark-filter-agreement');
 const benchmarkTable = document.getElementById('benchmark-table');
 const benchmarkTheadRow = document.getElementById('benchmark-thead-row');
@@ -128,19 +141,41 @@ function setupEventListeners() {
     tabCompare.addEventListener('click', () => switchView('compare'));
     tabBenchmark.addEventListener('click', () => switchView('benchmark'));
 
-    // Model selection
+    // Single Model & Format pickers
     modelSelect.addEventListener('change', (e) => {
         activeModel = e.target.value;
+        updateFormatDropdown(formatSelect, activeModel);
+        activeFormat = formatSelect.value;
         loadCurrentWord();
     });
 
+    formatSelect.addEventListener('change', (e) => {
+        activeFormat = e.target.value;
+        loadCurrentWord();
+    });
+
+    // Comparison Model & Format pickers
     compareModelSelectA.addEventListener('change', (e) => {
         compareModelA = e.target.value;
+        updateFormatDropdown(compareFormatSelectA, compareModelA);
+        compareFormatA = compareFormatSelectA.value;
+        loadCurrentWord();
+    });
+
+    compareFormatSelectA.addEventListener('change', (e) => {
+        compareFormatA = e.target.value;
         loadCurrentWord();
     });
 
     compareModelSelectB.addEventListener('change', (e) => {
         compareModelB = e.target.value;
+        updateFormatDropdown(compareFormatSelectB, compareModelB);
+        compareFormatB = compareFormatSelectB.value;
+        loadCurrentWord();
+    });
+
+    compareFormatSelectB.addEventListener('change', (e) => {
+        compareFormatB = e.target.value;
         loadCurrentWord();
     });
 
@@ -216,6 +251,23 @@ function setupEventListeners() {
     // Benchmark search and filter
     benchmarkSearch.addEventListener('input', renderBenchmarkTableRows);
     benchmarkFilterAgreement.addEventListener('change', renderBenchmarkTableRows);
+    benchmarkFilterFormat.addEventListener('change', () => {
+        benchmarkDataCache = null; // Invalidate cache to refetch with format filter if needed
+        loadBenchmarkView();
+    });
+}
+
+// Update format dropdown options based on selected model
+function updateFormatDropdown(selectElem, modelName) {
+    selectElem.innerHTML = '';
+    const availableFormats = modelFormatsMap[modelName] || formatsList || ['png'];
+    availableFormats.forEach(fmt => {
+        const opt = new Option(fmt.toUpperCase(), fmt);
+        selectElem.add(opt);
+    });
+    if (availableFormats.length > 0) {
+        selectElem.value = availableFormats[0];
+    }
 }
 
 // Switch between Single, Compare, and Benchmark views
@@ -262,14 +314,18 @@ function switchView(viewName) {
     }
 }
 
-// Fetch available models
+// Fetch available models and image formats
 async function fetchModels() {
     try {
         const res = await fetch('/api/models');
         const data = await res.json();
         modelsList = data.models || [];
+        formatsList = data.formats || [];
+        modelFormatsMap = data.model_formats || {};
+        entriesList = data.entries || [];
 
         statTotalModels.textContent = modelsList.length;
+        statTotalFormats.textContent = formatsList.map(f => f.toUpperCase()).join(', ') || '-';
 
         // Populate Model Selectors
         modelSelect.innerHTML = '';
@@ -277,18 +333,40 @@ async function fetchModels() {
         compareModelSelectB.innerHTML = '';
 
         modelsList.forEach((m) => {
-            const opt1 = new Option(m, m);
-            const opt2 = new Option(m, m);
-            const opt3 = new Option(m, m);
-            modelSelect.add(opt1);
-            compareModelSelectA.add(opt2);
-            compareModelSelectB.add(opt3);
+            modelSelect.add(new Option(m, m));
+            compareModelSelectA.add(new Option(m, m));
+            compareModelSelectB.add(new Option(m, m));
+        });
+
+        // Populate Benchmark format filter
+        benchmarkFilterFormat.innerHTML = '<option value="all">All Formats</option>';
+        formatsList.forEach(fmt => {
+            benchmarkFilterFormat.add(new Option(`${fmt.toUpperCase()} Only`, fmt));
         });
 
         if (modelsList.length > 0) {
             activeModel = modelsList[0];
+            updateFormatDropdown(formatSelect, activeModel);
+            activeFormat = formatSelect.value;
+
             compareModelA = modelsList[0];
-            compareModelB = modelsList.length > 1 ? modelsList[1] : modelsList[0];
+            updateFormatDropdown(compareFormatSelectA, compareModelA);
+            compareFormatA = compareFormatSelectA.value;
+
+            if (modelsList.length > 1) {
+                compareModelB = modelsList[1];
+            } else {
+                compareModelB = modelsList[0];
+            }
+            updateFormatDropdown(compareFormatSelectB, compareModelB);
+            // If same model, try to pick different format if available
+            const formatsB = modelFormatsMap[compareModelB] || [];
+            if (compareModelA === compareModelB && formatsB.length > 1) {
+                compareFormatB = formatsB[1];
+                compareFormatSelectB.value = compareFormatB;
+            } else {
+                compareFormatB = compareFormatSelectB.value;
+            }
 
             modelSelect.value = activeModel;
             compareModelSelectA.value = compareModelA;
@@ -404,7 +482,8 @@ async function fetchWordsList() {
 function populateWordDropdown(list) {
     wordSelect.innerHTML = '';
     list.forEach((item, idx) => {
-        const opt = new Option(`${idx + 1}. ${item.word}`, item.word);
+        const displayWord = item.word === ' ' ? '[ESPACIO EN BLANCO]' : item.word;
+        const opt = new Option(`${idx + 1}. ${displayWord}`, item.word);
         wordSelect.add(opt);
     });
     if (list.length > 0 && currentWordIndex < list.length) {
@@ -413,7 +492,7 @@ function populateWordDropdown(list) {
 }
 
 function filterWordDropdown(query) {
-    const filtered = wordsList.filter(w => w.word.includes(query));
+    const filtered = wordsList.filter(w => w.word.includes(query) || (w.word === ' ' && 'ESPACIO'.includes(query)));
     populateWordDropdown(filtered);
     if (filtered.length > 0) {
         const matchIdx = wordsList.findIndex(w => w.word === filtered[0].word);
@@ -430,7 +509,7 @@ async function loadCurrentWord() {
     const currentWord = wordsList[currentWordIndex].word;
     wordSelect.value = currentWord;
     wordCounterBadge.textContent = `${currentWordIndex + 1} / ${wordsList.length}`;
-    currentBoardWord.textContent = currentWord;
+    currentBoardWord.textContent = currentWord === ' ' ? '[ESPACIO]' : currentWord;
 
     try {
         const res = await fetch(`/api/word/${encodeURIComponent(currentWord)}`);
@@ -450,9 +529,20 @@ async function loadCurrentWord() {
 function renderSingleWordView() {
     if (!currentWordData || !currentWordData.models) return;
 
-    const modelAnalysis = currentWordData.models[activeModel];
-    wordTitle.textContent = currentWordData.word;
+    const targetKey = `${activeModel}__${activeFormat}`;
+    let modelAnalysis = currentWordData.models[targetKey];
+    
+    // Fallback if specific format key not found: find any format for activeModel
+    if (!modelAnalysis) {
+        const availableKeys = Object.keys(currentWordData.models).filter(k => k.startsWith(`${activeModel}__`));
+        if (availableKeys.length > 0) {
+            modelAnalysis = currentWordData.models[availableKeys[0]];
+        }
+    }
+
+    wordTitle.textContent = currentWordData.word === ' ' ? '[ESPACIO EN BLANCO]' : currentWordData.word;
     activeModelBadge.textContent = activeModel;
+    activeFormatBadge.textContent = activeFormat.toUpperCase();
 
     if (!modelAnalysis) {
         totalSamplesVal.textContent = '0';
@@ -465,7 +555,7 @@ function renderSingleWordView() {
         medianVal.textContent = '-';
         medianSwatch.style.backgroundColor = 'transparent';
         medianDistSub.textContent = '';
-        topCoordsList.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;">No data for this model</div>';
+        topCoordsList.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem;">No data for this model and format</div>';
         clearBoardGrid('single');
         return;
     }
@@ -516,14 +606,21 @@ function renderSingleWordView() {
 function renderCompareWordView() {
     if (!currentWordData || !currentWordData.models) return;
 
-    const analysisA = currentWordData.models[compareModelA];
-    const analysisB = currentWordData.models[compareModelB];
+    const keyA = `${compareModelA}__${compareFormatA}`;
+    const keyB = `${compareModelB}__${compareFormatB}`;
 
-    compareWordTitle.textContent = currentWordData.word;
-    boardTitleA.textContent = compareModelA;
-    boardTitleB.textContent = compareModelB;
-    cmpColAName.textContent = compareModelA;
-    cmpColBName.textContent = compareModelB;
+    const analysisA = currentWordData.models[keyA];
+    const analysisB = currentWordData.models[keyB];
+
+    compareWordTitle.textContent = currentWordData.word === ' ' ? '[ESPACIO EN BLANCO]' : currentWordData.word;
+    
+    const labelA = `${compareModelA} (${compareFormatA.toUpperCase()})`;
+    const labelB = `${compareModelB} (${compareFormatB.toUpperCase()})`;
+
+    boardTitleA.textContent = labelA;
+    boardTitleB.textContent = labelB;
+    cmpColAName.textContent = labelA;
+    cmpColBName.textContent = labelB;
 
     if (analysisA && analysisB) {
         const modeA = analysisA.mode_coord;
@@ -550,11 +647,17 @@ function renderCompareWordView() {
         cmpOverlapVal.textContent = `${(overlap * 100).toFixed(1)}%`;
 
         // Distances
-        if (currentWordData.comparison) {
-            const gd = currentWordData.comparison.mode_grid_distance;
-            const cd = currentWordData.comparison.mode_rgb_distance;
-            cmpGridDistVal.textContent = gd !== null ? `${gd} cells` : '-';
-            cmpRgbDistVal.textContent = cd !== null ? `${cd}` : '-';
+        if (boardData && boardData.cell_map) {
+            const cellModeA = boardData.cell_map[modeA];
+            const cellModeB = boardData.cell_map[modeB];
+            if (cellModeA && cellModeB) {
+                const dr = cellModeA.row_idx - cellModeB.row_idx;
+                const dc = cellModeA.col_idx - cellModeB.col_idx;
+                const gd = Math.sqrt(dr*dr + dc*dc).toFixed(2);
+                const rgbD = Math.sqrt((cellModeA.r-cellModeB.r)**2 + (cellModeA.g-cellModeB.g)**2 + (cellModeA.b-cellModeB.b)**2).toFixed(1);
+                cmpGridDistVal.textContent = `${gd} cells`;
+                cmpRgbDistVal.textContent = `${rgbD}`;
+            }
         }
 
         // Versus Swatches
@@ -674,11 +777,14 @@ function clearBoardGrid(prefix) {
 
 function updateBoardOverlays() {
     if (activeView === 'single') {
-        const modelAnalysis = currentWordData && currentWordData.models ? currentWordData.models[activeModel] : null;
+        const key = `${activeModel}__${activeFormat}`;
+        const modelAnalysis = currentWordData && currentWordData.models ? currentWordData.models[key] : null;
         updateBoardData('single', modelAnalysis);
     } else if (activeView === 'compare') {
-        const aA = currentWordData && currentWordData.models ? currentWordData.models[compareModelA] : null;
-        const aB = currentWordData && currentWordData.models ? currentWordData.models[compareModelB] : null;
+        const keyA = `${compareModelA}__${compareFormatA}`;
+        const keyB = `${compareModelB}__${compareFormatB}`;
+        const aA = currentWordData && currentWordData.models ? currentWordData.models[keyA] : null;
+        const aB = currentWordData && currentWordData.models ? currentWordData.models[keyB] : null;
         updateBoardData('compareA', aA);
         updateBoardData('compareB', aB);
     }
@@ -687,10 +793,10 @@ function updateBoardOverlays() {
 // Benchmark Table View
 async function loadBenchmarkView() {
     try {
-        if (!benchmarkDataCache) {
-            const res = await fetch('/api/benchmark');
-            benchmarkDataCache = await res.json();
-        }
+        const selectedFormat = benchmarkFilterFormat.value;
+        const url = selectedFormat && selectedFormat !== 'all' ? `/api/benchmark?format=${selectedFormat}` : '/api/benchmark';
+        const res = await fetch(url);
+        benchmarkDataCache = await res.json();
 
         renderBenchmarkTableStructure();
         renderBenchmarkTableRows();
@@ -701,13 +807,13 @@ async function loadBenchmarkView() {
 
 function renderBenchmarkTableStructure() {
     if (!benchmarkDataCache) return;
-    const models = benchmarkDataCache.models;
+    const entries = benchmarkDataCache.entries;
 
     benchmarkTheadRow.innerHTML = `
         <th style="width: 50px;">#</th>
         <th style="width: 160px;">Word</th>
-        ${models.map(m => `<th>👑 ${m} Mode</th><th>🎯 ${m} Media</th>`).join('')}
-        ${models.length >= 2 ? '<th>Mode Agreement</th><th>Median Agreement</th>' : ''}
+        ${entries.map(e => `<th>👑 ${e.display_name} Mode</th><th>🎯 ${e.display_name} Media</th>`).join('')}
+        ${entries.length >= 2 ? '<th>Mode Match</th><th>Media Match</th>' : ''}
         <th style="width: 100px;">Action</th>
     `;
 }
@@ -718,13 +824,13 @@ function renderBenchmarkTableRows() {
     const query = benchmarkSearch.value.trim().toUpperCase();
     const filter = benchmarkFilterAgreement.value;
     const rows = benchmarkDataCache.rows;
-    const models = benchmarkDataCache.models;
+    const entries = benchmarkDataCache.entries;
 
     benchmarkTbody.innerHTML = '';
 
     let displayedCount = 0;
     rows.forEach((row, idx) => {
-        if (query && !row.word.includes(query)) return;
+        if (query && !row.word.includes(query) && !(row.word === ' ' && 'ESPACIO'.includes(query))) return;
         if (filter === 'match' && !row.agreement) return;
         if (filter === 'diff' && row.agreement) return;
 
@@ -732,14 +838,15 @@ function renderBenchmarkTableRows() {
         const tr = document.createElement('tr');
 
         let modelsColsHtml = '';
-        models.forEach(m => {
-            const mode = row[`${m}_mode`] || '-';
-            const pct = row[`${m}_pct`] || 0;
-            const hex = row[`${m}_hex`] || '#888888';
+        entries.forEach(e => {
+            const key = e.key;
+            const mode = row[`${key}_mode`] || '-';
+            const pct = row[`${key}_pct`] || 0;
+            const hex = row[`${key}_hex`] || '#888888';
             
-            const median = row[`${m}_median`] || '-';
-            const medHex = row[`${m}_med_hex`] || '#888888';
-            const medDist = row[`${m}_med_dist`] || 0;
+            const median = row[`${key}_median`] || '-';
+            const medHex = row[`${key}_med_hex`] || '#888888';
+            const medDist = row[`${key}_med_dist`] || 0;
 
             modelsColsHtml += `
                 <td>
@@ -760,7 +867,7 @@ function renderBenchmarkTableRows() {
         });
 
         let comparisonColsHtml = '';
-        if (models.length >= 2) {
+        if (entries.length >= 2) {
             const isMatch = row.agreement;
             const isMedMatch = row.med_agreement;
             comparisonColsHtml = `
@@ -769,10 +876,12 @@ function renderBenchmarkTableRows() {
             `;
         }
 
+        const displayWord = row.word === ' ' ? '[ESPACIO EN BLANCO]' : row.word;
+
         tr.innerHTML = `
             <td style="color:var(--text-muted);">${idx + 1}</td>
             <td>
-                <button class="benchmark-word-btn" onclick="jumpToWord('${row.word}')">${row.word}</button>
+                <button class="benchmark-word-btn" onclick="jumpToWord('${row.word}')">${displayWord}</button>
             </td>
             ${modelsColsHtml}
             ${comparisonColsHtml}
@@ -804,11 +913,18 @@ function showCellTooltip(e, coord, prefix) {
     const cell = boardData.cell_map[coord];
     if (!cell) return;
 
-    let modelName = activeModel;
-    if (prefix === 'compareA') modelName = compareModelA;
-    if (prefix === 'compareB') modelName = compareModelB;
+    let targetKey = `${activeModel}__${activeFormat}`;
+    let displayLabel = `${activeModel} (${activeFormat.toUpperCase()})`;
 
-    const analysis = currentWordData && currentWordData.models ? currentWordData.models[modelName] : null;
+    if (prefix === 'compareA') {
+        targetKey = `${compareModelA}__${compareFormatA}`;
+        displayLabel = `${compareModelA} (${compareFormatA.toUpperCase()})`;
+    } else if (prefix === 'compareB') {
+        targetKey = `${compareModelB}__${compareFormatB}`;
+        displayLabel = `${compareModelB} (${compareFormatB.toUpperCase()})`;
+    }
+
+    const analysis = currentWordData && currentWordData.models ? currentWordData.models[targetKey] : null;
     const count = analysis && analysis.counts_per_coord ? (analysis.counts_per_coord[coord] || 0) : 0;
     const total = analysis ? analysis.total_samples : 100;
     const pct = ((count / total) * 100).toFixed(1);
@@ -831,8 +947,8 @@ function showCellTooltip(e, coord, prefix) {
             <span class="val">${cell.hex}</span>
         </div>
         <div class="tooltip-stat-row">
-            <span>Model:</span>
-            <span class="val" style="color: #a5b4fc;">${modelName}</span>
+            <span>Dataset:</span>
+            <span class="val" style="color: #a5b4fc;">${displayLabel}</span>
         </div>
         <div class="tooltip-stat-row">
             <span>Picks:</span>
