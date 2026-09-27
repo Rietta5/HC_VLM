@@ -871,11 +871,11 @@ body {
   font-size: 0.74rem;
 }
 
-/* Side-by-Side Comparison Layout */
+/* Stacked Vertical Comparison Layout (One below another) */
 .compare-boards-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
   width: 100%;
 }
 

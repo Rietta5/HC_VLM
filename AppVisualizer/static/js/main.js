@@ -622,6 +622,12 @@ function renderCompareWordView() {
     cmpColAName.textContent = labelA;
     cmpColBName.textContent = labelB;
 
+    const displayWordTag = currentWordData.word === ' ' ? '[ESPACIO]' : currentWordData.word;
+    const compareWordA = document.getElementById('compare-board-word-a');
+    const compareWordB = document.getElementById('compare-board-word-b');
+    if (compareWordA) compareWordA.textContent = displayWordTag;
+    if (compareWordB) compareWordB.textContent = displayWordTag;
+
     if (analysisA && analysisB) {
         const modeA = analysisA.mode_coord;
         const modeB = analysisB.mode_coord;
